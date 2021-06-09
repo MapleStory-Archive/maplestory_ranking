@@ -24,16 +24,20 @@ for character in char_list:
     data[rank_number]['level'] = character.select_one('td:nth-child(2) > div:nth-child(2) > div.font-size-0 > span:nth-child(1)').string[-3:] # level
     data[rank_number]['job'] = character.select_one('td:nth-child(2) > div:nth-child(2) > div.font-size-0 > span:nth-child(3)').string # job
     data[rank_number]['popularity'] = character.select_one('td.align-middle.d-none.d-sm-table-cell.text-center').string # popularity
+    # guild : 길드마크 있음, 길드마크 없음, 길드가 없음
     try:
-        data[rank_number]['guild'] = character.select_one('td:nth-child(4) > a > img')['alt'] # guild : 없는사람도 존재
+        data[rank_number]['guild'] = character.select_one('td:nth-child(4) > a > img')['alt'] # 길드마크 있음
     except:
-        data[rank_number]['guild'] = None
+        try:
+            data[rank_number]['guild'] = character.select_one('td:nth-child(4) > a').string.strip() # 길드마크 없음
+        except:
+            data[rank_number]['guild'] = None
 
     rank_number += 1
 
 
 
 # file_wirte
-    # 20캐릭터씩 10페이지 = 200캐릭터
+# 1페이지(20캐릭터)
 with open('test.json', 'w', encoding='utf-8') as data_file:
     json.dump(data, data_file, ensure_ascii=False, indent=4)
