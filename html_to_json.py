@@ -1,21 +1,18 @@
 import json
 import requests
 from bs4 import BeautifulSoup as bs
-
-#TODO: 전체 반복문 추가, JSON파일 하나당 캐릭터 몇개 추가?, MIN_LEVEL까지 반복 조건
-#TODO: 반복문 조건을 어떻게.. 페이지 단위(for).. 레벨단위(while)... 어떻게...??
-
 # maple.gg에서 파일 뽑은후 json으로 저장
-headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.77 Safari/537.36'}
 
-# request
+#TODO: 전체 반복문 추가, JSON파일 하나당 200캐릭터, MIN_LEVEL까지 반복 조건
+
+# request, bs
+headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.77 Safari/537.36'}
 html = requests.get(f'https://maple.gg/rank/total?page={1}', headers=headers)
-# bs
 soup = bs(html.content, 'html.parser')
 
 # parsing(name,rank,*server*,level,job,guild,popularity) -> list(dictionary)
-char_list = soup.select('section.container > section.box > div.box-content > table.table > tbody > tr')
 # [0]: 오지환, [1]: 태주 ....
+char_list = soup.select('section.container > section.box > div.box-content > table.table > tbody > tr')
 
 data = []
 rank_number = 0
