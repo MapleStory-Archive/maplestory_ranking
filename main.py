@@ -66,122 +66,130 @@ class Writefile:
         else:
             self.fp = open(self.CSV_FILE_DIR, 'wt+', encoding="ANSI", newline='')
 
-    # 아웃풋: 파일 객체 닫기
-    def close_file(self):
-        self.fp.close()
+class SearchData():
+    def __init__(self, target_lv):
+        self.target_lv = target_lv
+    
+    def search_section(self, pivot):
+        former_pivot = 0
+        first = True
 
-def search_page(target, a, b):
-    if a > b: a, b = b, a
-    pivot = a + (b - a) // 2
+        while True:
+            req_data = request_data(pivot)
 
-    req_data = request_data(pivot)
-    if req_data:
-        char_data = parse_data(req_data[0])
-    else:
-        print('데이터가 비어있습니다.')
-        return
+            # 리스트가 비어있는 경우 검사
+            if not req_data:
+                print('SearchData.search_section>> 리스트가 비어있습니다.')
+                break
+            else:
+                sample_lv = parse_data(req_data[0])['level'] # 대표값으로 0번째 인덱스 설정
+            
+            # 현재 확인중인 페이지의 레벨이 더 커서 페이지가 증가하는 방향
+            if sample_lv > self.target_lv:
+                print(f'SearchData.search_section>> 탐색한레벨이 타겟보다 큽니다. 현재데이터:{sample_lv}')
+                former_pivot = pivot
+                pivot *= 2
 
-    # Break Point
-    print(f'현재데이터: {char_data["level"]} a: {a}, b: {b}, pivot: {pivot}')
+                if first:
+                    first_drc = True
+                now_drc = True
 
-    if target > char_data['level']:
-        return search_page(target, a, pivot)
-    elif target < char_data['level']:
-        return search_page(target, pivot, b)
-    else:
-        return pivot
+            # 현재 확인중인 페이지의 레벨이 더 작아서 페이지가 감소하는 방향
+            elif sample_lv < self.target_lv:
+                print(f'SearchData.search_section>> 탐색한레벨이 타겟보다 작습니다. 현재데이터:{sample_lv}')
+                former_pivot = pivot
+                pivot //= 2
 
-def search_section(target, pivot):
-    former_pivot = 0
-    first_toggle = True
+                if first:
+                    first_drc = False
+                now_drc = False
 
-    while True:
+            # 페이지와 레벨이 같은 경우
+            else:
+                return pivot
+
+            # 탐색 방향이 바뀌고 구간이 정해진 경우
+            if not first and first_drc != now_drc:
+                break
+            
+            # 첫시도 토글 종료
+            if first:
+                first = not first
+        
+        return former_pivot, pivot
+
+    def search_sample_page(self, a, b):
+        if a > b:
+            a, b = b, a
+
+        pivot = a + (b - a) // 2
+
         req_data = request_data(pivot)
+        sample_lv = parse_data(req_data[0])['level']
+
+        print(f'SearchData.search_sample_page>> a:{a}, b:{b}, sample_lv:{sample_lv}')
         
-        if req_data:
-            chars_data = parse_data(req_data[0])
-            level = chars_data['level']
+        if self.target_lv > sample_lv:
+            return self.search_sample_page(a, pivot)
+        elif self.target_lv < sample_lv:
+            return self.search_sample_page(pivot, b)
         else:
-            # TODO: 재요청하는 방법 찾기
-            print('리스트가 비어있습니다. 재요청 하세요')
-            print(req_data)
-            break
-        
-        if level == target:
-            print(f'현재데이터와 타겟이 동일합니다 현재데이터:{level}')
             return pivot
-        if level > target:
-            former_pivot = pivot
-            pivot *= 2
 
-            if first_toggle:
-                toggle = True
-            my_toggle = True
+    @staticmethod
+    def search_critical_page(target_lv, sub_lv, a, b):
+        pivot = a + (b - a) // 2
+        req_data = request_data(pivot)
 
-            print(f'현재데이터가 타겟보다 큽니다. 현재데이터:{level}')
-        elif level < target:
-            former_pivot = pivot
-            pivot //= 2
+        if not req_data:
+            pivot_lv = None
+            print("SearchData.search_ciritical_page>> 요청한 데이터가 비어있습니다")
+            input('SearchData.search_ciritical_page>> 진행하려면 엔터...')
+        else:
+            pivot_lv = parse_data(req_data[0])['level']
 
-            if first_toggle:
-                toggle = False
-            my_toggle = False
+        print(f'SearchData.search_critical_page>> a: {a}, b: {b}, pivot: {pivot}, pivot_lv: {pivot_lv}')
 
-            print(f'현재데이터가 타겟보다 작습니다 현재데이터:{level}')
+        if b - a == 1: return a
+        elif pivot_lv == target_lv:
+            return SearchData.search_critical_page(pivot_lv, sub_lv, pivot, b)
+        elif pivot_lv == sub_lv:
+            return SearchData.search_critical_page(target_lv, pivot_lv, a, pivot)
 
-        # Break Point
-        if not first_toggle and my_toggle != toggle:
-            break
+    @staticmethod
+    def search_critical_index(target_lv, pivot):
+        req_data = request_data(pivot)
 
-        if first_toggle:
-            first_toggle = False
-    return search_page(target, pivot, former_pivot)
+        for i in range(len(req_data)):
+            char_data = parse_data(req_data[i])
 
-def search_critical_page(a, b, a_level, b_level):
-    if a > b:
-        a, b = b, a
-        a_level, b_level = b_level, a_level
+            if char_data['level'] < target_lv:
+                return pivot, i-1
+        return pivot+1, 0
 
-    pivot = a + (b - a) // 2
-    req_data = request_data(pivot)
-    if req_data: 
-        pivot_level = parse_data(req_data[0])['level']
-    else: 
-        pivot_level = None
+def search():
+    target_lv = 235
+    sub_lv = target_lv - 1
 
-    # Break Point
-    print(f'a:{a}, b:{b}, pivot:{pivot}, pivot_level:{pivot_level}')
+    search_tg = SearchData(target_lv)
+    search_sub = SearchData(sub_lv)
     
-    if b - a == 1: return a
-    elif pivot_level == a_level:
-        return search_critical_page(pivot, b, pivot_level, b_level)
-    elif pivot_level == b_level:
-        return search_critical_page(a, pivot, a_level, b_level)
+    tg_section = search_tg.search_section(1)
+    if type(tg_section) == tuple:
+        tg_sample = search_tg.search_sample_page(*tg_section)
+    else:
+        tg_sample = tg_section
 
-
-# 인풋: table row에서 레벨이 변하는 페이지(암거나 넣는건 ㄴㄴ)
-# 아웃풋: 레벨이 변하는 인덱스 리턴
-def search_critical_index(pivot):
-    req_data = request_data(pivot)
-
-    for i in range(len(req_data)):
-        char_data = parse_data(req_data[i])
-
-        if not i:
-            pivot_level = char_data['level']
-        
-        if char_data['level'] < pivot_level:
-            return pivot, i
+    sub_section = search_sub.search_section(18432)
+    if type(sub_section) == tuple:
+        sub_sample = search_sub.search_sample_page(*sub_section)
+    else:
+        sub_sample = sub_section
     
-    return pivot + 1, 0
-        
+    crt_page = SearchData.search_critical_page(target_lv, sub_lv, tg_sample, sub_sample)
+    crt_index = SearchData.search_critical_index(target_lv, crt_page)
 
+    print(crt_index) # 페이지, 인덱스 튜플로 리턴
 
+# TODO: search_section하고 search_sample_page 페이지중에서 0번째 인덱스만 확인하는거 수정하기
 if __name__ == "__main__":
-    a_level = 235
-    b_level = a_level - 1
-    a_pivot = search_section(a_level, 1)
-    b_pivot = search_section(b_level, a_pivot)
-
-    critical_page = search_critical_page(a_pivot, b_pivot, a_level, b_level)
-    print(search_critical_index(critical_page))
