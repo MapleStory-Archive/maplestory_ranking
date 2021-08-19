@@ -14,7 +14,7 @@ def request_data(page):
         html = requests.get(f'https://maple.gg/rank/total?page={page}', headers=headers)
     except requests.exceptions.ConnectionError as p:
         print(f'error name: {p}(서버와의연결오류)')
-        # print(f'요쳉에 실패한 페이지: {page}') 
+        # print(f'요청에 실패한 페이지: {page}') 
         return p
         
     soup = bs(html.content, 'html.parser')
@@ -70,7 +70,7 @@ class SearchData():
     def __init__(self, target_lv):
         self.target_lv = target_lv
     
-    def search_section(self, pivot):
+    def section(self, pivot):
         former_pivot = 0
         first = True
 
@@ -79,14 +79,14 @@ class SearchData():
 
             # 리스트가 비어있는 경우 검사
             if not req_data:
-                print('SearchData.search_section>> 리스트가 비어있습니다.')
+                print('SearchData.section>> 리스트가 비어있습니다.')
                 break
             else:
                 sample_lv = parse_data(req_data[0])['level'] # 대표값으로 0번째 인덱스 설정
             
             # 현재 확인중인 페이지의 레벨이 더 커서 페이지가 증가하는 방향
             if sample_lv > self.target_lv:
-                print(f'SearchData.search_section>> 탐색한레벨이 타겟보다 큽니다. 현재데이터:{sample_lv}')
+                print(f'SearchData.section>> 탐색한레벨이 타겟보다 큽니다. 현재데이터:{sample_lv}')
                 former_pivot = pivot
                 pivot *= 2
 
@@ -96,7 +96,7 @@ class SearchData():
 
             # 현재 확인중인 페이지의 레벨이 더 작아서 페이지가 감소하는 방향
             elif sample_lv < self.target_lv:
-                print(f'SearchData.search_section>> 탐색한레벨이 타겟보다 작습니다. 현재데이터:{sample_lv}')
+                print(f'SearchData.section>> 탐색한레벨이 타겟보다 작습니다. 현재데이터:{sample_lv}')
                 former_pivot = pivot
                 pivot //= 2
 
@@ -118,7 +118,8 @@ class SearchData():
         
         return former_pivot, pivot
 
-    def search_sample_page(self, a, b):
+    # TODO: sample_page 페이지중에서 0번째 인덱스만 확인하는거 수정하기
+    def sample_page(self, a, b):
         if a > b:
             a, b = b, a
 
@@ -127,17 +128,17 @@ class SearchData():
         req_data = request_data(pivot)
         sample_lv = parse_data(req_data[0])['level']
 
-        print(f'SearchData.search_sample_page>> a:{a}, b:{b}, sample_lv:{sample_lv}')
+        print(f'SearchData.sample_page>> a:{a}, b:{b}, sample_lv:{sample_lv}')
         
         if self.target_lv > sample_lv:
-            return self.search_sample_page(a, pivot)
+            return self.sample_page(a, pivot)
         elif self.target_lv < sample_lv:
-            return self.search_sample_page(pivot, b)
+            return self.sample_page(pivot, b)
         else:
             return pivot
 
     @staticmethod
-    def search_critical_page(target_lv, sub_lv, a, b):
+    def critical_page(target_lv, sub_lv, a, b):
         pivot = a + (b - a) // 2
         req_data = request_data(pivot)
 
@@ -148,16 +149,16 @@ class SearchData():
         else:
             pivot_lv = parse_data(req_data[0])['level']
 
-        print(f'SearchData.search_critical_page>> a: {a}, b: {b}, pivot: {pivot}, pivot_lv: {pivot_lv}')
+        print(f'SearchData.critical_page>> a: {a}, b: {b}, pivot: {pivot}, pivot_lv: {pivot_lv}')
 
         if b - a == 1: return a
         elif pivot_lv == target_lv:
-            return SearchData.search_critical_page(pivot_lv, sub_lv, pivot, b)
+            return SearchData.critical_page(pivot_lv, sub_lv, pivot, b)
         elif pivot_lv == sub_lv:
-            return SearchData.search_critical_page(target_lv, pivot_lv, a, pivot)
+            return SearchData.critical_page(target_lv, pivot_lv, a, pivot)
 
     @staticmethod
-    def search_critical_index(target_lv, pivot):
+    def critical_index(target_lv, pivot):
         req_data = request_data(pivot)
 
         for i in range(len(req_data)):
@@ -167,29 +168,81 @@ class SearchData():
                 return pivot, i-1
         return pivot+1, 0
 
+class RakeData:
+    def __init__(self):
+        self.type_of_class = list()
+
+    def class_data(self, pivot, index):
+        print(f'RakeData.class_data>> now_page {pivot}')
+        req_data = request_data(pivot)
+
+        # 역순으로 진행
+        for i in reversed(range(index+1)):
+            char_data = parse_data(req_data[i])
+            
+            # 딕셔너리에 없으면 추가
+            if char_data['class'] not in self.type_of_class.keys():
+                # 초보자는 제외
+                if char_data['class'] == '초보자' or char_data['class'] == '시티즌' or char_data['class'] == '노블레스':
+                    continue
+                
+                # 개인페이지 요청
+                try:
+                    html = requests.get(f"https://maple.gg/u/{char_data['name']}", headers=headers)
+                except requests.exceptions.ConnectionError as p:
+                    print(f'error name: {p}(서버와의연결오류)')
+                    # print(f'요청에 실패한 페이지: {page}') 
+                    return p
+                soup = bs(html.content, 'html.parser')
+                rank_of_class = int(''.join(soup.select_one('#user-profile > section > div.row.row-normal > div.col-lg-8 > div.row.row-normal.user-additional > div:nth-child(5) > span').text[:-1].split(',')))
+                self.type_of_class.append({'직업': char_data['class'], '인원수': rank_of_class})
+                
+                print(f"RakeData.class_data>> {self.type_of_class}")
+
+        if len(self.type_of_class) >= 45: return self.type_of_class
+        return self.class_data(pivot-1, 19)
+
+        # 딕셔너리 파일쓰기
+        
+    
+    def server_data(self):
+        pass
+
+
 def search():
-    target_lv = 235
+    target_lv = 250
     sub_lv = target_lv - 1
 
     search_tg = SearchData(target_lv)
     search_sub = SearchData(sub_lv)
     
-    tg_section = search_tg.search_section(1)
+    tg_section = search_tg.section(3000)
     if type(tg_section) == tuple:
-        tg_sample = search_tg.search_sample_page(*tg_section)
+        tg_sample = search_tg.sample_page(*tg_section)
     else:
         tg_sample = tg_section
 
-    sub_section = search_sub.search_section(18432)
+    sub_section = search_sub.section(tg_sample)
     if type(sub_section) == tuple:
-        sub_sample = search_sub.search_sample_page(*sub_section)
+        sub_sample = search_sub.sample_page(*sub_section)
     else:
         sub_sample = sub_section
     
-    crt_page = SearchData.search_critical_page(target_lv, sub_lv, tg_sample, sub_sample)
-    crt_index = SearchData.search_critical_index(target_lv, crt_page)
+    crt_page = SearchData.critical_page(target_lv, sub_lv, tg_sample, sub_sample)
+    crt_index = SearchData.critical_index(target_lv, crt_page)
 
-    print(crt_index) # 페이지, 인덱스 튜플로 리턴
+    return crt_index
 
-# TODO: search_section하고 search_sample_page 페이지중에서 0번째 인덱스만 확인하는거 수정하기
+
+def file_write(class_rank_list):
+    class_rank_list = sorted(class_rank_list, key=lambda x: x['인원수'], reverse=True)
+    
+    with open('./rank/test.csv', 'wt+', encoding='ANSI', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=['직업', '인원수'])
+
+        writer.writeheader()   
+        for obj in class_rank_list:
+            writer.writerow(obj)
+
 if __name__ == "__main__":
+    print(search())
